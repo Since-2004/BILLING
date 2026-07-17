@@ -1,0 +1,9 @@
+{
+    "git.ignoreLimitWarning": true,
+    "files.watcherExclude": {
+        "**/build-out/**": true,
+        "**/dist/**": true,
+        "**/.next/**": true,
+        "**/node_modules/**": true
+    }
+}

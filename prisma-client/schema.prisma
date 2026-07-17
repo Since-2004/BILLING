@@ -1,0 +1,531 @@
+generator client {
+  provider = "prisma-client-js"
+  output   = "../prisma-client"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+// ==========================================
+// 3.1 Master Tables
+// ==========================================
+
+model Company {
+  id                      String    @id @default(uuid())
+  name                    String
+  gstin                   String?
+  address                 String?
+  state_code              String?
+  logo_url                String?
+  financial_year_start    DateTime?
+  billing_mode            String    @default("BOTH")
+  owner_name              String?
+  invoice_use_branch_name Boolean   @default(false)
+
+  created_at DateTime @default(now())
+  updated_at DateTime @updatedAt
+  created_by String?
+  is_deleted Boolean  @default(false)
+
+  branches         Branch[]
+  users            User[]
+  clients          Client[]
+  suppliers        Supplier[]
+  items            Item[]
+  item_groups      ItemGroup[]
+  item_units       ItemUnit[]
+  transactions     Transaction[]
+  discount_schemes DiscountScheme[]
+}
+
+model Branch {
+  id         String  @id @default(uuid())
+  company_id String
+  name       String
+  address    String?
+  gstin      String?
+  phone      String?
+  is_default Boolean @default(false)
+
+  bank_name        String?
+  bank_account_no  String?
+  bank_ifsc        String?
+  bank_branch      String?
+  digital_sign_url String?
+
+  company Company @relation(fields: [company_id], references: [id])
+
+  created_at         DateTime           @default(now())
+  updated_at         DateTime           @updatedAt
+  created_by         String?
+  is_deleted         Boolean            @default(false)
+  user_branch_access UserBranchAccess[]
+  transactions       Transaction[]
+  clients            Client[]
+}
+
+model User {
+  id         String  @id @default(uuid())
+  email      String  @unique
+  name       String
+  company_id String?
+  password   String
+  role       String  @default("VIEWER") // OWNER/ADMIN/MANAGER/CASHIER/VIEWER
+
+  company Company? @relation(fields: [company_id], references: [id])
+
+  created_at         DateTime           @default(now())
+  updated_at         DateTime           @updatedAt
+  created_by         String?
+  is_deleted         Boolean            @default(false)
+  user_branch_access UserBranchAccess[]
+}
+
+model UserBranchAccess {
+  user_id   String
+  branch_id String
+
+  user   User   @relation(fields: [user_id], references: [id])
+  branch Branch @relation(fields: [branch_id], references: [id])
+
+  @@id([user_id, branch_id])
+}
+
+model Client {
+  id              String  @id @default(uuid())
+  company_id      String
+  branch_id       String?
+  name            String
+  phone           String?
+  email           String?
+  gstin           String?
+  address         String?
+  state_code      String?
+  credit_limit    Int?
+  opening_balance Int?
+  client_type     String  @default("RETAIL") // RETAIL/WHOLESALE
+  rate_type       String  @default("RATE_1") // RATE_1/RATE_2/RATE_3
+
+  company Company @relation(fields: [company_id], references: [id])
+  branch  Branch? @relation(fields: [branch_id], references: [id])
+
+  created_at DateTime @default(now())
+  updated_at DateTime @updatedAt
+  created_by String?
+  is_deleted Boolean  @default(false)
+
+  loyalty_reward LoyaltyReward?
+  product_prices ClientProductPrice[]
+}
+
+model Supplier {
+  id         String  @id @default(uuid())
+  company_id String
+  name       String
+  phone      String?
+  email      String?
+  gstin      String?
+  address    String?
+  state_code String?
+
+  company Company @relation(fields: [company_id], references: [id])
+
+  created_at DateTime @default(now())
+  updated_at DateTime @updatedAt
+  created_by String?
+  is_deleted Boolean  @default(false)
+}
+
+model Item {
+  id              String  @id @default(uuid())
+  company_id      String
+  name            String
+  code            String?
+  barcode         String?
+  group_id        String?
+  unit_id         String?
+  hsn_code        String?
+  tax_rate        Float?
+  item_type       String  @default("PRODUCT") // PRODUCT/SERVICE/COMPOSITE
+  sale_price_1    Int?
+  sale_price_2    Int?
+  sale_price_3    Int?
+  purchase_price  Int?
+  mrp             Int?
+  min_margin_pct  Float?
+  track_inventory Boolean @default(true)
+  track_batches   Boolean @default(false)
+  track_serials   Boolean @default(false)
+  reorder_level   Int?
+  reorder_qty     Int?
+  image_url       String?
+
+  company Company    @relation(fields: [company_id], references: [id])
+  group   ItemGroup? @relation(fields: [group_id], references: [id])
+  unit    ItemUnit?  @relation(fields: [unit_id], references: [id])
+
+  created_at DateTime @default(now())
+  updated_at DateTime @updatedAt
+  created_by String?
+  is_deleted Boolean  @default(false)
+
+  variants        ItemVariant[]
+  batches         ItemBatch[]
+  serials         ItemSerial[]
+  price_slabs     PriceSlab[]
+  vendor_catalogs ItemVendorCatalog[]
+  stock_ledgers   StockLedger[]
+  client_prices   ClientProductPrice[]
+}
+
+model ItemGroup {
+  id         String  @id @default(uuid())
+  company_id String
+  name       String
+  parent_id  String?
+
+  company  Company     @relation(fields: [company_id], references: [id])
+  parent   ItemGroup?  @relation("GroupHierarchy", fields: [parent_id], references: [id])
+  children ItemGroup[] @relation("GroupHierarchy")
+  items    Item[]
+
+  created_at DateTime @default(now())
+}
+
+model ItemUnit {
+  id           String @id @default(uuid())
+  company_id   String
+  name         String
+  abbreviation String
+
+  company Company @relation(fields: [company_id], references: [id])
+  items   Item[]
+
+  created_at DateTime @default(now())
+}
+
+model ItemVariant {
+  id             String  @id @default(uuid())
+  item_id        String
+  size           String?
+  colour         String?
+  barcode        String?
+  price_modifier Int     @default(0)
+
+  item Item @relation(fields: [item_id], references: [id], onDelete: Cascade)
+}
+
+model ItemBatch {
+  id             String    @id @default(uuid())
+  item_id        String
+  batch_no       String
+  mfg_date       DateTime?
+  expiry_date    DateTime?
+  purchase_price Int?
+
+  item    Item         @relation(fields: [item_id], references: [id], onDelete: Cascade)
+  serials ItemSerial[]
+}
+
+model ItemSerial {
+  id        String  @id @default(uuid())
+  item_id   String
+  batch_id  String?
+  serial_no String
+  status    String  @default("AVAILABLE") // AVAILABLE/SOLD/RETURNED
+
+  item  Item       @relation(fields: [item_id], references: [id], onDelete: Cascade)
+  batch ItemBatch? @relation(fields: [batch_id], references: [id])
+}
+
+model PriceSlab {
+  id      String @id @default(uuid())
+  item_id String
+  min_qty Int
+  max_qty Int?
+  price   Int
+
+  item Item @relation(fields: [item_id], references: [id], onDelete: Cascade)
+}
+
+model ItemVendorCatalog {
+  id               String  @id @default(uuid())
+  item_id          String
+  supplier_id      String
+  vendor_item_code String?
+  vendor_price     Int
+  lead_days        Int?
+
+  item Item @relation(fields: [item_id], references: [id], onDelete: Cascade)
+}
+
+// ==========================================
+// Phase 3: Billing Engine (Transactions)
+// ==========================================
+
+model Transaction {
+  id         String @id @default(uuid())
+  company_id String
+  branch_id  String
+
+  type           String // SALES_INVOICE, PURCHASE_BILL, SALES_RETURN, PURCHASE_RETURN, QUOTATION, ORDER
+  transaction_no String
+  date           DateTime @default(now())
+
+  party_id   String? // References Client or Supplier depending on type
+  party_name String?
+
+  subtotal    Int    @default(0) // Stored in paise/cents
+  discount    Int    @default(0)
+  tax_amount  Int    @default(0)
+  total       Int    @default(0)
+  amount_paid Int    @default(0)
+  status      String @default("DRAFT") // DRAFT, PENDING, PAID, CANCELLED
+
+  notes String?
+
+  items    TransactionItem[]
+  taxes    TransactionTax[]
+  payments TransactionPayment[]
+
+  company Company @relation(fields: [company_id], references: [id])
+  branch  Branch  @relation(fields: [branch_id], references: [id])
+
+  created_at DateTime @default(now())
+  updated_at DateTime @updatedAt
+  created_by String?
+}
+
+model TransactionItem {
+  id             String  @id @default(uuid())
+  transaction_id String
+  item_id        String?
+
+  item_name  String
+  quantity   Float
+  rate       Int // Stored in paise/cents
+  discount   Int    @default(0)
+  tax_rate   Float  @default(0)
+  tax_amount Int    @default(0)
+  total      Int    @default(0)
+
+  transaction Transaction @relation(fields: [transaction_id], references: [id], onDelete: Cascade)
+}
+
+model TransactionTax {
+  id             String @id @default(uuid())
+  transaction_id String
+  tax_name       String // CGST, SGST, IGST, CESS
+  rate           Float
+  taxable_amount Int    @default(0)
+  tax_amount     Int    @default(0)
+
+  transaction Transaction @relation(fields: [transaction_id], references: [id], onDelete: Cascade)
+}
+
+model TransactionPayment {
+  id             String    @id @default(uuid())
+  transaction_id String
+  mode           String // CASH/CARD/UPI/CREDIT/CHEQUE/MIXED
+  amount         Int
+  ref_no         String?
+  bank_id        String?
+  cheque_date    DateTime?
+
+  transaction Transaction @relation(fields: [transaction_id], references: [id], onDelete: Cascade)
+}
+
+// ==========================================
+// Phase 4 & 5: Inventory, Warehouse, & Orders
+// ==========================================
+
+model StockLedger {
+  id         String @id @default(uuid())
+  company_id String
+  branch_id  String
+  item_id    String
+
+  transaction_id String? // Reference to the Transaction that caused this movement
+
+  type     String // IN, OUT
+  quantity Float
+  remarks  String?
+
+  date       DateTime @default(now())
+  created_at DateTime @default(now())
+  created_by String?
+
+  item Item @relation(fields: [item_id], references: [id])
+}
+
+model LocationTransfer {
+  id             String @id @default(uuid())
+  company_id     String
+  from_branch_id String
+  to_branch_id   String
+
+  status      String   @default("PENDING") // PENDING, IN_TRANSIT, RECEIVED
+  transfer_no String
+  date        DateTime @default(now())
+
+  items TransferItem[]
+
+  created_at DateTime @default(now())
+  updated_at DateTime @updatedAt
+  created_by String?
+}
+
+model TransferItem {
+  id          String @id @default(uuid())
+  transfer_id String
+  item_id     String
+  quantity    Float
+
+  transfer LocationTransfer @relation(fields: [transfer_id], references: [id], onDelete: Cascade)
+}
+
+// ==========================================
+// Phase 6: Accounts & Ledgers
+// ==========================================
+
+model Account {
+  id         String @id @default(uuid())
+  company_id String
+
+  name String
+  type String // ASSET, LIABILITY, EQUITY, REVENUE, EXPENSE
+  code String?
+
+  created_at DateTime @default(now())
+
+  lines JournalEntryLine[]
+}
+
+model JournalEntry {
+  id         String @id @default(uuid())
+  company_id String
+  branch_id  String
+
+  date      DateTime @default(now())
+  reference String? // Could link to a Transaction ID
+  narration String?
+
+  lines JournalEntryLine[]
+
+  created_at DateTime @default(now())
+  created_by String?
+}
+
+model JournalEntryLine {
+  id               String @id @default(uuid())
+  journal_entry_id String
+  account_id       String
+
+  debit  Int @default(0) // paise/cents
+  credit Int @default(0) // paise/cents
+
+  journal_entry JournalEntry @relation(fields: [journal_entry_id], references: [id], onDelete: Cascade)
+  account       Account      @relation(fields: [account_id], references: [id])
+}
+
+// ==========================================
+// Phase 7 & 8: POS, Shifts, HR & Loyalty
+// ==========================================
+
+model Shift {
+  id         String @id @default(uuid())
+  company_id String
+  branch_id  String
+  user_id    String
+
+  start_time DateTime  @default(now())
+  end_time   DateTime?
+
+  opening_cash Int  @default(0)
+  closing_cash Int?
+
+  status String @default("ACTIVE") // ACTIVE, CLOSED
+
+  created_at DateTime @default(now())
+}
+
+model Attendance {
+  id         String @id @default(uuid())
+  company_id String
+  branch_id  String
+  user_id    String
+
+  date      DateTime  @default(now())
+  clock_in  DateTime
+  clock_out DateTime?
+
+  status String @default("PRESENT") // PRESENT, HALF_DAY, ABSENT
+
+  created_at DateTime @default(now())
+}
+
+model Payroll {
+  id         String @id @default(uuid())
+  company_id String
+  user_id    String
+
+  month Int
+  year  Int
+
+  basic_salary Int @default(0)
+  allowances   Int @default(0)
+  deductions   Int @default(0)
+  net_payable  Int @default(0)
+
+  status String @default("DRAFT") // DRAFT, PAID
+
+  created_at DateTime @default(now())
+}
+
+model LoyaltyReward {
+  id         String @id @default(uuid())
+  company_id String
+  client_id  String @unique
+  points     Int    @default(0)
+  tier       String @default("SILVER")
+
+  points_earned Int @default(0)
+  points_spent  Int @default(0)
+  balance       Int @default(0)
+
+  created_at DateTime @default(now())
+  updated_at DateTime @updatedAt
+
+  client Client @relation(fields: [client_id], references: [id])
+}
+
+model DiscountScheme {
+  id             String    @id @default(uuid())
+  company_id     String
+  name           String
+  type           String    @default("BILL")
+  discount_value Int       @default(0)
+  is_percentage  Boolean   @default(true)
+  min_bill_value Int       @default(0)
+  start_date     DateTime?
+  end_date       DateTime?
+  is_active      Boolean   @default(true)
+  is_deleted     Boolean   @default(false)
+  created_by     String?
+  created_at     DateTime  @default(now())
+  updated_at     DateTime  @updatedAt
+  company        Company   @relation(fields: [company_id], references: [id])
+}
+
+model ClientProductPrice {
+  id        String @id @default(uuid())
+  client_id String
+  item_id   String
+  price     Int // Price stored in paise/cents
+
+  client Client @relation(fields: [client_id], references: [id], onDelete: Cascade)
+  item   Item   @relation(fields: [item_id], references: [id], onDelete: Cascade)
+
+  @@unique([client_id, item_id])
+}
