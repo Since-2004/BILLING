@@ -37,6 +37,14 @@ if (fs.existsSync(standaloneDir)) {
     console.log('Copied node_modules/@prisma folder to standalone node_modules')
   }
 
+  // Copy pg folder to standalone node_modules
+  const pgSrc = path.join(__dirname, 'node_modules', 'pg')
+  const pgDest = path.join(standaloneDir, 'node_modules', 'pg')
+  if (fs.existsSync(pgSrc)) {
+    fs.cpSync(pgSrc, pgDest, { recursive: true })
+    console.log('Copied node_modules/pg folder to standalone node_modules')
+  }
+
   console.log('Asset copying completed successfully!')
 
   // Patch server.js to avoid process.chdir(__dirname) crash in packaged electron apps
