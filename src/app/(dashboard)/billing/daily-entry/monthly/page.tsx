@@ -544,7 +544,7 @@ function MonthlyReportContent() {
               <option value="">All Customers</option>
               <option value="Daily Sales Customer">Daily Sales Customer</option>
               <option value="Walk-in Customer">Walk-in Customer</option>
-              {clients.map(c => (
+              {[...clients].sort((a, b) => (a.name || '').localeCompare(b.name || '', undefined, { sensitivity: 'base' })).map(c => (
                 <option key={c.id} value={c.name}>{c.name}</option>
               ))}
             </select>

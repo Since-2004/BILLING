@@ -455,7 +455,7 @@ export default function BillingPage() {
                 className="w-full px-3 py-2 border border-zinc-300 dark:border-zinc-700 rounded-md bg-transparent text-sm"
               >
                 <option value="">Walk-in Customer</option>
-                {clients.filter((c: any) => !c.branch_id || c.branch_id === selectedBranch).map((c: any) => (
+                {clients.filter((c: any) => !c.branch_id || c.branch_id === selectedBranch).sort((a: any, b: any) => (a.name || '').localeCompare(b.name || '', undefined, { sensitivity: 'base' })).map((c: any) => (
                   <option key={c.id} value={c.id}>{c.name}</option>
                 ))}
               </select>

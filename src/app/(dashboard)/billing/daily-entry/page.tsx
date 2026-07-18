@@ -425,7 +425,7 @@ export default function DailyEntryPage() {
               className="w-full px-3 py-1.5 border border-zinc-200 dark:border-zinc-800 rounded-lg bg-zinc-50 dark:bg-zinc-900 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
             >
               <option value="">Daily Sales Customer</option>
-              {clients.filter(c => !c.branch_id || c.branch_id === selectedBranch).map(c => (
+              {clients.filter(c => !c.branch_id || c.branch_id === selectedBranch).sort((a, b) => (a.name || '').localeCompare(b.name || '', undefined, { sensitivity: 'base' })).map(c => (
                 <option key={c.id} value={c.id}>{c.name}</option>
               ))}
             </select>

@@ -158,7 +158,7 @@ export default function QuotationPage() {
               className="w-full px-3 py-2 border border-zinc-300 dark:border-zinc-700 rounded-md bg-transparent"
             >
               <option value="">Walk-in Customer</option>
-              {clients.map((c: any) => (
+              {[...clients].sort((a: any, b: any) => (a.name || '').localeCompare(b.name || '', undefined, { sensitivity: 'base' })).map((c: any) => (
                 <option key={c.id} value={c.id}>{c.name}</option>
               ))}
             </select>

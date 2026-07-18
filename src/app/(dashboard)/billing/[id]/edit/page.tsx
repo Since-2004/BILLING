@@ -499,11 +499,11 @@ export default function EditBillingPage() {
                 >
                   <option value="">{isPurchaseType ? '-- Select Supplier --' : '-- Walk-in Customer --'}</option>
                   {isPurchaseType ? (
-                    suppliers.map(s => (
+                    [...suppliers].sort((a, b) => (a.name || '').localeCompare(b.name || '', undefined, { sensitivity: 'base' })).map(s => (
                       <option key={s.id} value={s.id}>{s.name}</option>
                     ))
                   ) : (
-                    clients.map(c => (
+                    [...clients].sort((a, b) => (a.name || '').localeCompare(b.name || '', undefined, { sensitivity: 'base' })).map(c => (
                       <option key={c.id} value={c.id}>{c.name}</option>
                     ))
                   )}

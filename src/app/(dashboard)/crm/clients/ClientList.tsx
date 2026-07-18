@@ -22,7 +22,7 @@ export default function ClientList({ initialClients, branches = [], items = [] }
       (c.phone && c.phone.includes(searchTerm))
     const matchesBranch = selectedBranchFilter === 'ALL' || c.branch_id === selectedBranchFilter
     return matchesSearch && matchesBranch
-  })
+  }).sort((a, b) => (a.name || '').localeCompare(b.name || '', undefined, { sensitivity: 'base' }))
 
   const filteredProducts = items.filter(item =>
     item.name.toLowerCase().includes(productSearch.toLowerCase()) ||
