@@ -9,7 +9,7 @@
     "start": "next start",
     "lint": "next lint",
     "electron": "npx @electron/rebuild -v 42.4.1 -f -w better-sqlite3 && electron .",
-    "dist": "npm run build && electron-builder"
+    "dist": "npm run build && npx @electron/rebuild -v 42.4.1 -f -w better-sqlite3 && electron-builder"
   },
   "dependencies": {
     "@base-ui/react": "^1.6.0",
@@ -59,7 +59,7 @@
   },
   "build": {
     "appId": "com.billing.erp",
-    "npmRebuild": true,
+    "npmRebuild": false,
     "productName": "Nucleus",
     "directories": {
       "output": "dist"
@@ -68,6 +68,7 @@
       "main.js",
       "dev.db",
       "package.json",
+      ".env",
       "node_modules/better-sqlite3/**/*",
       "node_modules/bindings/**/*",
       "prisma-client/**/*",

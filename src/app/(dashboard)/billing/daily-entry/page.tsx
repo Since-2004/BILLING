@@ -408,7 +408,7 @@ export default function DailyEntryPage() {
   }
 
   return (
-    <div className="flex flex-col h-[calc(100vh-6rem)] gap-6">
+    <div className="flex flex-col lg:h-[calc(100vh-6rem)] h-auto gap-6">
       {/* Header controls bar */}
       <div className="bg-white dark:bg-zinc-900 p-4 rounded-xl border border-zinc-200 dark:border-zinc-800 shadow-sm flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div className="flex items-center gap-3">
@@ -506,9 +506,9 @@ export default function DailyEntryPage() {
         </div>
       </div>
 
-      <div className="flex-1 flex gap-6 overflow-hidden">
+      <div className="flex-1 flex flex-col lg:flex-row gap-6 overflow-y-auto lg:overflow-hidden">
         {/* Left pane: Product quantities grid list */}
-        <div className="flex-1 flex flex-col bg-white dark:bg-zinc-900 rounded-xl border border-zinc-200 dark:border-zinc-800 overflow-hidden shadow-sm">
+        <div className="flex-1 flex flex-col bg-white dark:bg-zinc-900 rounded-xl border border-zinc-200 dark:border-zinc-800 overflow-hidden shadow-sm min-h-[400px] lg:min-h-0">
           {/* Live search input */}
           <div className="p-4 border-b border-zinc-200 dark:border-zinc-800 bg-zinc-50/50 dark:bg-zinc-900/30 flex gap-4">
             <div className="relative flex-1">
@@ -537,8 +537,8 @@ export default function DailyEntryPage() {
             )}
           </div>
 
-          {/* Table Container */}
-          <div className="flex-1 overflow-y-auto">
+          {/* Desktop Product Table (Visible on desktop) */}
+          <div className="hidden lg:block flex-1 overflow-y-auto">
             <table className="w-full border-collapse text-sm text-left">
               <thead>
                 <tr className="bg-zinc-50 dark:bg-zinc-800/40 text-zinc-500 dark:text-zinc-400 text-xs font-semibold uppercase border-b border-zinc-200 dark:border-zinc-800">
@@ -667,10 +667,131 @@ export default function DailyEntryPage() {
               </tbody>
             </table>
           </div>
+
+          {/* Mobile Product Card List (Visible on mobile/tablet) */}
+          <div className="block lg:hidden flex-1 overflow-y-auto p-4 space-y-4">
+            {filteredItems.map((item, idx) => {
+              const stock = stockMap[item.id] ?? 0
+              const qty = quantities[item.id] || ''
+              const hasQty = quantities[item.id] > 0
+              
+              return (
+                <div key={item.id} className="bg-zinc-50 dark:bg-zinc-900/40 p-4 rounded-xl border border-zinc-200 dark:border-zinc-800/80 space-y-3 shadow-sm">
+                  <div className="flex justify-between items-start">
+                    <div>
+                      <h4 className="font-semibold text-zinc-900 dark:text-zinc-100">{item.name}</h4>
+                      <p className="text-xs text-zinc-400 font-mono mt-0.5">
+                        {item.code || '-'}{item.barcode ? ` / ${item.barcode}` : ''}
+                      </p>
+                    </div>
+                    <span className={`text-[10px] px-2 py-0.5 rounded font-semibold ${
+                      stock > 10 ? 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400' :
+                      stock > 0  ? 'bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-400' :
+                                   'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400'
+                    }`}>
+                      {stock} available
+                    </span>
+                  </div>
+                  
+                  {/* Price, Discount and GST fields */}
+                  <div className="grid grid-cols-3 gap-2.5 text-xs">
+                    <div>
+                      <span className="block text-[10px] text-zinc-400 uppercase font-bold mb-1">Price (Rs.)</span>
+                      {hasQty ? (
+                        <input
+                          type="number"
+                          step="any"
+                          value={customPrices[item.id] !== undefined ? (customPrices[item.id] / 100).toString() : ((item.sale_price_1 || 0) / 100).toString()}
+                          onChange={e => {
+                            const val = parseFloat(e.target.value) || 0
+                            setCustomPrices(prev => ({ ...prev, [item.id]: Math.round(val * 100) }))
+                          }}
+                          className="w-full border border-zinc-200 dark:border-zinc-800 rounded px-2 py-1 bg-white dark:bg-zinc-950 font-mono text-blue-600 dark:text-blue-400"
+                        />
+                      ) : (
+                        <span className="font-mono text-zinc-600 dark:text-zinc-300">
+                          {formatCurrency(customPrices[item.id] !== undefined ? customPrices[item.id] : (item.sale_price_1 || 0))}
+                        </span>
+                      )}
+                    </div>
+                    <div>
+                      <span className="block text-[10px] text-zinc-400 uppercase font-bold mb-1">Disc (Rs.)</span>
+                      {hasQty ? (
+                        <input
+                          type="number"
+                          step="any"
+                          placeholder="0.00"
+                          value={customDiscounts[item.id] !== undefined ? (customDiscounts[item.id] / 100).toString() : ''}
+                          onChange={e => {
+                            const val = parseFloat(e.target.value) || 0
+                            setCustomDiscounts(prev => ({ ...prev, [item.id]: Math.round(val * 100) }))
+                          }}
+                          className="w-full border border-zinc-200 dark:border-zinc-800 rounded px-2 py-1 bg-white dark:bg-zinc-950 font-mono text-red-600 dark:text-red-400"
+                        />
+                      ) : (
+                        <span className="font-mono text-zinc-400">-</span>
+                      )}
+                    </div>
+                    <div>
+                      <span className="block text-[10px] text-zinc-400 uppercase font-bold mb-1">GST Rate</span>
+                      <span className="font-mono block mt-1 text-zinc-600 dark:text-zinc-300">
+                        {isTaxBilling ? `${item.tax_rate || 0}%` : '0%'}
+                      </span>
+                    </div>
+                  </div>
+
+                  {/* Quantity Input and Action Button */}
+                  <div className="flex justify-between items-center pt-2 border-t border-zinc-200/60 dark:border-zinc-800/40">
+                    <span className="text-xs text-zinc-400 font-medium">Quantity Sold</span>
+                    <div className="flex items-center gap-2">
+                      <div className="flex items-center border border-zinc-200 dark:border-zinc-800 rounded-lg overflow-hidden bg-white dark:bg-zinc-950">
+                        <button
+                          type="button"
+                          onClick={() => adjustQty(item.id, -1, stock)}
+                          className="px-3 py-1 bg-zinc-50 dark:bg-zinc-900 hover:bg-zinc-100 dark:hover:bg-zinc-800 font-bold transition-colors text-sm"
+                        >
+                          -
+                        </button>
+                        <input
+                          type="number"
+                          step="any"
+                          value={qty}
+                          placeholder="0"
+                          onChange={e => handleQtyChange(item.id, e.target.value, stock)}
+                          className="w-12 text-center text-xs font-semibold bg-transparent border-none outline-none focus:ring-0 p-1 font-mono [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                        />
+                        <button
+                          type="button"
+                          onClick={() => adjustQty(item.id, 1, stock)}
+                          className="px-3 py-1 bg-zinc-50 dark:bg-zinc-900 hover:bg-zinc-100 dark:hover:bg-zinc-800 font-bold transition-colors text-sm"
+                        >
+                          +
+                        </button>
+                      </div>
+                      {hasQty && (
+                        <button 
+                          type="button"
+                          onClick={() => clearItemQty(item.id)}
+                          className="p-1.5 bg-zinc-100 hover:bg-red-50 dark:bg-zinc-800 dark:hover:bg-red-900/20 text-zinc-400 hover:text-red-500 rounded-lg transition-colors"
+                        >
+                          <Trash2 className="w-3.5 h-3.5" />
+                        </button>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              )
+            })}
+            {filteredItems.length === 0 && (
+              <div className="py-12 text-center text-zinc-400 text-sm">
+                No products found matching "{searchQuery}"
+              </div>
+            )}
+          </div>
         </div>
 
         {/* Right pane: Entry summary sidebar */}
-        <div className="w-80 flex flex-col bg-white dark:bg-zinc-900 rounded-xl border border-zinc-200 dark:border-zinc-800 overflow-hidden shadow-sm">
+        <div className="w-full lg:w-80 flex flex-col bg-white dark:bg-zinc-900 rounded-xl border border-zinc-200 dark:border-zinc-800 overflow-hidden shadow-sm shrink-0">
           <div className="p-4 border-b border-zinc-200 dark:border-zinc-800 bg-zinc-50/50 dark:bg-zinc-900/30">
             <h2 className="font-bold text-zinc-900 dark:text-zinc-100 uppercase tracking-wider text-xs">Summary Details</h2>
           </div>

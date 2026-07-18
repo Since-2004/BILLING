@@ -3,12 +3,6 @@ const path = require('path')
 const fs = require('fs')
 const net = require('net')
 
-try {
-  require('dotenv').config()
-} catch (err) {
-  console.warn('Failed to load dotenv configuration:', err.message)
-}
-
 let nextProcess = null
 
 // Resolve writable database path
@@ -22,6 +16,25 @@ if (appPath.includes('app.asar') && !fs.existsSync(appPath)) {
   if (fs.existsSync(unpackedPath)) {
     appPath = unpackedPath
   }
+}
+
+// Load environment variables dynamically from writable AppData, process.cwd(), or packaged app path
+try {
+  const localEnvPath = path.join(process.cwd(), '.env')
+  const appDataEnvPath = path.join(userDataPath, '.env')
+  const packagedEnvPath = path.join(appPath, '.env')
+  
+  let envPath = packagedEnvPath
+  if (fs.existsSync(appDataEnvPath)) {
+    envPath = appDataEnvPath
+  } else if (fs.existsSync(localEnvPath)) {
+    envPath = localEnvPath
+  }
+  
+  require('dotenv').config({ path: envPath })
+  console.log('Loaded environment configuration from:', envPath)
+} catch (err) {
+  console.warn('Failed to load dotenv configuration:', err.message)
 }
 
 function runDatabaseMigrations(dbFilePath) {
