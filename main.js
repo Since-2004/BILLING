@@ -20,24 +20,39 @@ if (appPath.includes('app.asar') && !fs.existsSync(appPath)) {
 
 // Load environment variables dynamically from writable AppData, process.cwd(), resources dir, or packaged app path
 try {
-  const localEnvPath = path.join(process.cwd(), '.env')
-  const appDataEnvPath = path.join(userDataPath, '.env')
-  const resourcesEnvPath = path.join(path.dirname(appPath), '.env')
-  const packagedEnvPath = path.join(appPath, '.env')
-  
-  let envPath = packagedEnvPath
-  if (fs.existsSync(appDataEnvPath)) {
-    envPath = appDataEnvPath
-  } else if (fs.existsSync(localEnvPath)) {
-    envPath = localEnvPath
-  } else if (fs.existsSync(resourcesEnvPath)) {
-    envPath = resourcesEnvPath
+  const envPaths = [
+    path.join(userDataPath, '.env'),
+    path.join(process.cwd(), '.env'),
+    path.join(appPath, '.env'),
+    path.join(path.dirname(appPath), '.env'),
+    process.resourcesPath ? path.join(process.resourcesPath, '.env') : null
+  ].filter(Boolean)
+
+  let loaded = false
+  for (const envPath of envPaths) {
+    if (fs.existsSync(envPath)) {
+      require('dotenv').config({ path: envPath })
+      console.log('Loaded environment configuration from:', envPath)
+      loaded = true
+      break
+    }
   }
-  
-  require('dotenv').config({ path: envPath })
-  console.log('Loaded environment configuration from:', envPath)
+  if (!loaded) {
+    console.log('No .env file found on disk, applying embedded production environment defaults.')
+  }
 } catch (err) {
   console.warn('Failed to load dotenv configuration:', err.message)
+}
+
+// Ensure production database and environment variables are always defined
+if (!process.env.DATABASE_URL) {
+  process.env.DATABASE_URL = "postgresql://postgres.zvpuvuhrjkcnstyokchw:dd%40eVaT244QV-bM@aws-1-ap-south-1.pooler.supabase.com:5432/postgres"
+}
+if (!process.env.NEXT_PUBLIC_SUPABASE_URL) {
+  process.env.NEXT_PUBLIC_SUPABASE_URL = "https://zvpuvuhrjkcnstyokchw.supabase.co"
+}
+if (!process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY) {
+  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY = "sb_publishable_ai81Kfnegw9bA4mAPadBoA_OYHu1x5g"
 }
 
 function runDatabaseMigrations(dbFilePath) {

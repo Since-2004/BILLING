@@ -1,29 +1,21 @@
 import { PrismaClient } from '../prisma-client'
 import { PrismaPg } from '@prisma/adapter-pg'
-import { PrismaBetterSqlite3 } from '@prisma/adapter-better-sqlite3'
-// @ts-expect-error - better-sqlite3 untyped module
-import Database from 'better-sqlite3'
 import { Pool } from 'pg'
 
 const prismaClientSingleton = () => {
-  const dbUrl = process.env.DATABASE_URL || ''
+  let dbUrl = process.env.DATABASE_URL || ''
 
-  if (dbUrl.startsWith('file:') || dbUrl.endsWith('.db') || dbUrl.includes('dev.db')) {
-    // Local SQLite database fallback using PrismaBetterSqlite3 driver adapter
-    const filePath = dbUrl.replace(/^file:/, '')
-    const sqlite = new Database(filePath)
-    const adapter = new PrismaBetterSqlite3(sqlite)
-    return new PrismaClient({ adapter })
-  } else {
-    // Online PostgreSQL database using PrismaPg driver adapter with SSL support for Supabase/Cloud DBs
-    const isLocalhost = dbUrl.includes('localhost') || dbUrl.includes('127.0.0.1')
-    const pool = new Pool({ 
-      connectionString: dbUrl,
-      ssl: isLocalhost ? false : { rejectUnauthorized: false }
-    })
-    const adapter = new PrismaPg(pool)
-    return new PrismaClient({ adapter })
+  if (!dbUrl || dbUrl.startsWith('file:') || dbUrl.endsWith('.db') || dbUrl.includes('dev.db')) {
+    dbUrl = "postgresql://postgres.zvpuvuhrjkcnstyokchw:dd%40eVaT244QV-bM@aws-1-ap-south-1.pooler.supabase.com:5432/postgres"
   }
+
+  const isLocalhost = dbUrl.includes('localhost') || dbUrl.includes('127.0.0.1')
+  const pool = new Pool({ 
+    connectionString: dbUrl,
+    ssl: isLocalhost ? false : { rejectUnauthorized: false }
+  })
+  const adapter = new PrismaPg(pool)
+  return new PrismaClient({ adapter })
 }
 
 declare const globalThis: {
