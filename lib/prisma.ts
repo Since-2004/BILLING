@@ -1,6 +1,7 @@
 import { PrismaClient } from '../prisma-client'
 import { PrismaPg } from '@prisma/adapter-pg'
 import { PrismaBetterSqlite3 } from '@prisma/adapter-better-sqlite3'
+// @ts-expect-error - better-sqlite3 untyped module
 import Database from 'better-sqlite3'
 import { Pool } from 'pg'
 
