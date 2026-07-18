@@ -78,16 +78,16 @@
         "to": ".next/standalone"
       }
     ],
-    "asar": false,
+    "asar": true,
     "extraFiles": [
       ".env",
       {
         "from": "node_modules/.prisma",
-        "to": "resources/app/node_modules/.prisma"
+        "to": "resources/app.asar.unpacked/node_modules/.prisma"
       },
       {
         "from": "node_modules/.prisma",
-        "to": "resources/app/.next/standalone/node_modules/.prisma"
+        "to": "resources/app.asar.unpacked/.next/standalone/node_modules/.prisma"
       }
     ],
     "asarUnpack": [
