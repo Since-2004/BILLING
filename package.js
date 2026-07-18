@@ -98,6 +98,49 @@ http.ServerResponse.prototype.setHeader = function(name, value) {
       console.log('Successfully removed standalone better-sqlite3 to enable parent node_modules fallback!')
     }
   }
+
+  // Patch @prisma/client entrypoints with robust fallback path resolution for Electron ASAR
+  const prismaFallbackPatch = `
+const path = require('path')
+const fs = require('fs')
+
+let client
+try {
+  client = require('.prisma/client/default')
+} catch (e) {
+  let loaded = false
+  const possiblePaths = [
+    path.join(__dirname, '..', '..', '.prisma', 'client', 'default.js'),
+    path.join(__dirname, '..', '..', '.prisma', 'client', 'index.js'),
+    __dirname.replace('app.asar', 'app.asar.unpacked').replace(path.join('@prisma', 'client'), path.join('.prisma', 'client', 'default.js')),
+    __dirname.replace('app.asar', 'app.asar.unpacked').replace(path.join('@prisma', 'client'), path.join('.prisma', 'client', 'index.js')),
+    path.join(process.cwd(), 'node_modules', '.prisma', 'client', 'default.js'),
+    path.join(process.cwd(), 'resources', 'app.asar.unpacked', 'node_modules', '.prisma', 'client', 'default.js')
+  ]
+
+  for (const p of possiblePaths) {
+    if (fs.existsSync(p)) {
+      client = require(p)
+      loaded = true
+      break
+    }
+  }
+  if (!loaded) throw e
+}
+
+module.exports = { ...client }
+`
+
+  function patchPrismaClientFiles(dirPath) {
+    if (fs.existsSync(dirPath)) {
+      fs.writeFileSync(path.join(dirPath, 'default.js'), prismaFallbackPatch, 'utf8')
+      fs.writeFileSync(path.join(dirPath, 'index.js'), prismaFallbackPatch, 'utf8')
+      console.log('Successfully patched Prisma Client entrypoints in:', dirPath)
+    }
+  }
+
+  patchPrismaClientFiles(path.join(__dirname, 'node_modules', '@prisma', 'client'))
+  patchPrismaClientFiles(path.join(standaloneDir, 'node_modules', '@prisma', 'client'))
 } else {
   console.error('Error: .next/standalone folder not found. Run npm run build first.')
   process.exit(1)
