@@ -71,7 +71,8 @@
       ".env",
       "node_modules/better-sqlite3/**/*",
       "node_modules/bindings/**/*",
-      "prisma-client/**/*",
+      "node_modules/.prisma/**/*",
+      "node_modules/@prisma/**/*",
       {
         "from": ".next/standalone",
         "to": ".next/standalone"

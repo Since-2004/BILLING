@@ -20,6 +20,23 @@ if (fs.existsSync(standaloneDir)) {
     fs.cpSync(staticSrc, staticDest, { recursive: true })
     console.log('Copied .next/static/ folder to standalone')
   }
+
+  // Copy .prisma folder to standalone node_modules
+  const dotPrismaSrc = path.join(__dirname, 'node_modules', '.prisma')
+  const dotPrismaDest = path.join(standaloneDir, 'node_modules', '.prisma')
+  if (fs.existsSync(dotPrismaSrc)) {
+    fs.cpSync(dotPrismaSrc, dotPrismaDest, { recursive: true })
+    console.log('Copied node_modules/.prisma folder to standalone node_modules')
+  }
+
+  // Copy @prisma folder to standalone node_modules
+  const atPrismaSrc = path.join(__dirname, 'node_modules', '@prisma')
+  const atPrismaDest = path.join(standaloneDir, 'node_modules', '@prisma')
+  if (fs.existsSync(atPrismaSrc)) {
+    fs.cpSync(atPrismaSrc, atPrismaDest, { recursive: true })
+    console.log('Copied node_modules/@prisma folder to standalone node_modules')
+  }
+
   console.log('Asset copying completed successfully!')
 
   // Patch server.js to avoid process.chdir(__dirname) crash in packaged electron apps
