@@ -80,60 +80,26 @@ export default function BillingPage() {
       const billingInput = active.getAttribute('data-billing-input')
       if (!billingInput) return
 
+      // If in search input and text is typed, let search behavior (adding item to cart) run
       if (billingInput === 'search') {
         const searchInput = active as HTMLInputElement
         if (searchInput.value.trim() !== '') {
           return
         }
-        e.preventDefault()
-        const firstQty = document.querySelector('[data-billing-input="qty"][data-index="0"]') as HTMLElement
-        if (firstQty) {
-          firstQty.focus()
-          if (firstQty instanceof HTMLInputElement) firstQty.select()
-        } else {
-          const discountInput = document.querySelector('[data-billing-input="discount"]') as HTMLElement
-          if (discountInput) {
-            discountInput.focus()
-            if (discountInput instanceof HTMLInputElement) discountInput.select()
-          }
-        }
-      } else if (billingInput === 'customer') {
-        e.preventDefault()
-        if (searchInputRef.current) {
-          searchInputRef.current.focus()
-        }
-      } else if (billingInput === 'branch') {
-        e.preventDefault()
-        const customerSelect = document.querySelector('[data-billing-input="customer"]') as HTMLElement
-        if (customerSelect) customerSelect.focus()
-      } else if (billingInput === 'qty') {
-        e.preventDefault()
-        const index = active.getAttribute('data-index')
-        const rateInput = document.querySelector(`[data-billing-input="rate"][data-index="${index}"]`) as HTMLElement
-        if (rateInput) {
-          rateInput.focus()
-          if (rateInput instanceof HTMLInputElement) rateInput.select()
-        }
-      } else if (billingInput === 'rate') {
-        e.preventDefault()
-        const index = parseInt(active.getAttribute('data-index') || '0', 10)
-        const nextQty = document.querySelector(`[data-billing-input="qty"][data-index="${index + 1}"]`) as HTMLElement
-        if (nextQty) {
-          nextQty.focus()
-          if (nextQty instanceof HTMLInputElement) nextQty.select()
-        } else {
-          const discountInput = document.querySelector('[data-billing-input="discount"]') as HTMLElement
-          if (discountInput) {
-            discountInput.focus()
-            if (discountInput instanceof HTMLInputElement) discountInput.select()
-          }
-        }
-      } else if (billingInput === 'discount') {
-        e.preventDefault()
-        const paymentModeSelect = document.querySelector('[data-billing-input="payment-mode"]') as HTMLElement
-        if (paymentModeSelect) paymentModeSelect.focus()
-      } else if (billingInput === 'payment-mode') {
-        e.preventDefault()
+      }
+
+      e.preventDefault()
+
+      // Find all visible interactive inputs on the page with [data-billing-input]
+      const allInputs = Array.from(document.querySelectorAll<HTMLElement>('[data-billing-input]'))
+        .filter(el => el.offsetWidth > 0 && el.offsetHeight > 0 && !el.hasAttribute('disabled'))
+
+      const currentIndex = allInputs.indexOf(active)
+      if (currentIndex !== -1 && currentIndex + 1 < allInputs.length) {
+        const nextEl = allInputs[currentIndex + 1]
+        nextEl.focus()
+        if (nextEl instanceof HTMLInputElement) nextEl.select()
+      } else if (currentIndex === allInputs.length - 1) {
         const checkoutBtn = document.getElementById('checkout-btn') as HTMLElement
         if (checkoutBtn) checkoutBtn.focus()
       }

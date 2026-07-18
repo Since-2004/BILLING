@@ -119,77 +119,18 @@ export default function DailyEntryPage() {
       const deInput = active.getAttribute('data-de-input')
       if (!deInput) return
 
-      if (deInput === 'date') {
-        e.preventDefault()
-        const nextInput = document.querySelector('[data-de-input="dc-number"]') as HTMLElement
-        if (nextInput) {
-          nextInput.focus()
-          if (nextInput instanceof HTMLInputElement) nextInput.select()
-        }
-      } else if (deInput === 'dc-number') {
-        e.preventDefault()
-        const nextInput = document.querySelector('[data-de-input="branch"]') as HTMLElement
-        if (nextInput) nextInput.focus()
-      } else if (deInput === 'branch') {
-        e.preventDefault()
-        const nextInput = document.querySelector('[data-de-input="customer"]') as HTMLElement
-        if (nextInput) nextInput.focus()
-      } else if (deInput === 'customer') {
-        e.preventDefault()
-        const nextInput = document.querySelector('[data-de-input="payment-mode"]') as HTMLElement
-        if (nextInput) nextInput.focus()
-      } else if (deInput === 'payment-mode') {
-        e.preventDefault()
-        const nextInput = document.querySelector('[data-de-input="search"]') as HTMLElement
-        if (nextInput) {
-          nextInput.focus()
-          if (nextInput instanceof HTMLInputElement) nextInput.select()
-        }
-      } else if (deInput === 'search') {
-        e.preventDefault()
-        const nextInput = document.querySelector('[data-de-input="qty"][data-index="0"]') as HTMLElement
-        if (nextInput) {
-          nextInput.focus()
-          if (nextInput instanceof HTMLInputElement) nextInput.select()
-        }
-      } else if (deInput === 'qty') {
-        e.preventDefault()
-        const index = parseInt(active.getAttribute('data-index') || '0', 10)
-        const nextQty = document.querySelector(`[data-de-input="qty"][data-index="${index + 1}"]`) as HTMLElement
-        if (nextQty) {
-          nextQty.focus()
-          if (nextQty instanceof HTMLInputElement) nextQty.select()
-        } else {
-          const discountInput = document.querySelector('[data-de-input="discount"]') as HTMLElement
-          if (discountInput) {
-            discountInput.focus()
-            if (discountInput instanceof HTMLInputElement) discountInput.select()
-          }
-        }
-      } else if (deInput === 'price') {
-        e.preventDefault()
-        const index = active.getAttribute('data-index')
-        const rowDiscountInput = document.querySelector(`[data-de-input="row-discount"][data-index="${index}"]`) as HTMLElement
-        if (rowDiscountInput) {
-          rowDiscountInput.focus()
-          if (rowDiscountInput instanceof HTMLInputElement) rowDiscountInput.select()
-        }
-      } else if (deInput === 'row-discount') {
-        e.preventDefault()
-        const index = parseInt(active.getAttribute('data-index') || '0', 10)
-        const nextQty = document.querySelector(`[data-de-input="qty"][data-index="${index + 1}"]`) as HTMLElement
-        if (nextQty) {
-          nextQty.focus()
-          if (nextQty instanceof HTMLInputElement) nextQty.select()
-        } else {
-          const discountInput = document.querySelector('[data-de-input="discount"]') as HTMLElement
-          if (discountInput) {
-            discountInput.focus()
-            if (discountInput instanceof HTMLInputElement) discountInput.select()
-          }
-        }
-      } else if (deInput === 'discount') {
-        e.preventDefault()
+      e.preventDefault()
+
+      // Find all visible interactive inputs on the page with [data-de-input]
+      const allInputs = Array.from(document.querySelectorAll<HTMLElement>('[data-de-input]'))
+        .filter(el => el.offsetWidth > 0 && el.offsetHeight > 0 && !el.hasAttribute('disabled'))
+
+      const currentIndex = allInputs.indexOf(active)
+      if (currentIndex !== -1 && currentIndex + 1 < allInputs.length) {
+        const nextEl = allInputs[currentIndex + 1]
+        nextEl.focus()
+        if (nextEl instanceof HTMLInputElement) nextEl.select()
+      } else if (currentIndex === allInputs.length - 1) {
         const saveBtn = document.getElementById('save-entry-btn') as HTMLElement
         if (saveBtn) saveBtn.focus()
       }
