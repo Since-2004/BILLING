@@ -243,9 +243,32 @@ function findFreePort(callback) {
 
 function startNextServer(port, callback) {
   const serverPath = path.join(appPath, '.next', 'standalone', 'server.js')
-  
+  const standaloneNodeModules = path.join(appPath, '.next', 'standalone', 'node_modules')
+  const appNodeModules = path.join(appPath, 'node_modules')
+
+  // Ensure .prisma is present in both node_modules locations
+  const dotPrismaInApp = path.join(appNodeModules, '.prisma')
+  const dotPrismaInStandalone = path.join(standaloneNodeModules, '.prisma')
+
+  if (fs.existsSync(dotPrismaInApp) && !fs.existsSync(dotPrismaInStandalone)) {
+    try {
+      fs.cpSync(dotPrismaInApp, dotPrismaInStandalone, { recursive: true })
+      console.log('Synced .prisma to standalone node_modules successfully')
+    } catch (e) {
+      console.error('Failed to sync .prisma to standalone:', e.message)
+    }
+  } else if (fs.existsSync(dotPrismaInStandalone) && !fs.existsSync(dotPrismaInApp)) {
+    try {
+      fs.cpSync(dotPrismaInStandalone, dotPrismaInApp, { recursive: true })
+      console.log('Synced .prisma to app node_modules successfully')
+    } catch (e) {
+      console.error('Failed to sync .prisma to app node_modules:', e.message)
+    }
+  }
+
   process.env.PORT = String(port)
   process.env.HOSTNAME = '127.0.0.1'
+  process.env.NODE_PATH = [standaloneNodeModules, appNodeModules, process.env.NODE_PATH].filter(Boolean).join(path.delimiter)
 
   console.log(`Starting Next.js standalone server on port ${port}...`)
   

@@ -80,7 +80,15 @@
     ],
     "asar": false,
     "extraFiles": [
-      ".env"
+      ".env",
+      {
+        "from": "node_modules/.prisma",
+        "to": "resources/app/node_modules/.prisma"
+      },
+      {
+        "from": "node_modules/.prisma",
+        "to": "resources/app/.next/standalone/node_modules/.prisma"
+      }
     ],
     "asarUnpack": [
       "**/node_modules/better-sqlite3/**/*",
