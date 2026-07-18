@@ -18,10 +18,11 @@ if (appPath.includes('app.asar') && !fs.existsSync(appPath)) {
   }
 }
 
-// Load environment variables dynamically from writable AppData, process.cwd(), or packaged app path
+// Load environment variables dynamically from writable AppData, process.cwd(), resources dir, or packaged app path
 try {
   const localEnvPath = path.join(process.cwd(), '.env')
   const appDataEnvPath = path.join(userDataPath, '.env')
+  const resourcesEnvPath = path.join(path.dirname(appPath), '.env')
   const packagedEnvPath = path.join(appPath, '.env')
   
   let envPath = packagedEnvPath
@@ -29,6 +30,8 @@ try {
     envPath = appDataEnvPath
   } else if (fs.existsSync(localEnvPath)) {
     envPath = localEnvPath
+  } else if (fs.existsSync(resourcesEnvPath)) {
+    envPath = resourcesEnvPath
   }
   
   require('dotenv').config({ path: envPath })

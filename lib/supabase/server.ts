@@ -57,7 +57,7 @@ export function createClient() {
           return { data: { user: { id: user.id, email: user.email } }, error: null }
         } catch (err: any) {
           console.error('Login database error:', err);
-          return { data: { user: null }, error: { message: 'Database connection error. Please try again.' } }
+          return { data: { user: null }, error: { message: err?.message || 'Database connection error. Please try again.' } }
         }
       },
 
@@ -86,7 +86,7 @@ export function createClient() {
           }
         } catch (err: any) {
           console.error('Signup database error:', err);
-          return { data: { user: null }, error: { message: 'Database connection error. Please try again.' } }
+          return { data: { user: null }, error: { message: err?.message || 'Database connection error. Please try again.' } }
         }
       },
 

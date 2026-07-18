@@ -78,6 +78,9 @@
       }
     ],
     "asar": true,
+    "extraFiles": [
+      ".env"
+    ],
     "asarUnpack": [
       "**/node_modules/better-sqlite3/**/*"
     ],
