@@ -21,6 +21,15 @@ if (fs.existsSync(standaloneDir)) {
     console.log('Copied .next/static/ folder to standalone')
   }
 
+  // Copy BUILD_ID file
+  const buildIdSrc = path.join(__dirname, '.next', 'BUILD_ID')
+  const buildIdDest = path.join(standaloneDir, '.next', 'BUILD_ID')
+  if (fs.existsSync(buildIdSrc)) {
+    fs.mkdirSync(path.dirname(buildIdDest), { recursive: true })
+    fs.cpSync(buildIdSrc, buildIdDest)
+    console.log('Copied .next/BUILD_ID to standalone')
+  }
+
   // Copy .prisma folder to standalone node_modules
   const dotPrismaSrc = path.join(__dirname, 'node_modules', '.prisma')
   const dotPrismaDest = path.join(standaloneDir, 'node_modules', '.prisma')
@@ -65,27 +74,22 @@ if (fs.existsSync(standaloneDir)) {
 const http = require('http');
 const originalSetHeader = http.ServerResponse.prototype.setHeader;
 http.ServerResponse.prototype.setHeader = function(name, value) {
-  const lowerName = name && typeof name === 'string' ? name.toLowerCase() : '';
-  if (lowerName === 'x-action-redirect' || lowerName === 'location') {
-    if (typeof value === 'string') {
-      let cleanValue = '';
-      for (let i = 0; i < value.length; i++) {
-        const ch = value.charCodeAt(i);
-        // Allow tab (9), standard ASCII printable characters (32-126), and Latin-1 supplement (160-255)
-        if (ch === 9 || (ch >= 32 && ch <= 126) || (ch >= 160 && ch <= 255)) {
-          cleanValue += value[i];
-        } else if (ch > 255) {
-          // Percent-encode Unicode characters so they are valid in HTTP headers
-          cleanValue += encodeURIComponent(value[i]);
-        }
+  if (typeof value === 'string') {
+    let cleanValue = '';
+    for (let i = 0; i < value.length; i++) {
+      const ch = value.charCodeAt(i);
+      if (ch === 9 || (ch >= 32 && ch <= 126)) {
+        cleanValue += value[i];
+      } else if (ch > 126) {
+        cleanValue += encodeURIComponent(value[i]);
       }
-      value = cleanValue;
     }
+    value = cleanValue;
   }
   return originalSetHeader.call(this, name, value);
 };
 `;
-    if (!serverContent.includes('x-action-redirect') || !serverContent.includes('originalSetHeader')) {
+    if (!serverContent.includes('originalSetHeader')) {
       serverContent = debugCode + '\n' + serverContent
       console.log('Successfully patched server.js with header sanitization logic!')
     }

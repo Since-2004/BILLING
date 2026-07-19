@@ -269,6 +269,7 @@ function startNextServer(port, callback) {
   process.env.PORT = String(port)
   process.env.HOSTNAME = '127.0.0.1'
   process.env.NODE_PATH = [standaloneNodeModules, appNodeModules, process.env.NODE_PATH].filter(Boolean).join(path.delimiter)
+  process.env.NEXT_CACHE_DIR = path.join(userDataPath, '.cache')
 
   console.log(`Starting Next.js standalone server on port ${port}...`)
   
@@ -291,8 +292,15 @@ function startNextServer(port, callback) {
     console.error('[Next.js Server Error]', data.toString().trim())
   })
 
+  let interval = null
+
+  nextProcess.on('exit', (code, signal) => {
+    console.error(`Next.js server process exited with code ${code} and signal ${signal}`)
+    if (interval) clearInterval(interval)
+  })
+
   // Poll port until Next.js server starts listening
-  const interval = setInterval(() => {
+  interval = setInterval(() => {
     const client = net.connect({ port: port, host: '127.0.0.1' }, () => {
       clearInterval(interval)
       client.destroy()
@@ -343,26 +351,23 @@ function patchServerIfNeeded() {
         console.log('main.js: Patched server.js process.chdir')
       }
 
-      if (!serverContent.includes('x-action-redirect') || !serverContent.includes('originalSetHeader')) {
+      if (!serverContent.includes('originalSetHeader')) {
         const patchCode = `
 // Intercept and sanitize HTTP headers to prevent ERR_INVALID_CHAR crashes
 const http = require('http');
 const originalSetHeader = http.ServerResponse.prototype.setHeader;
 http.ServerResponse.prototype.setHeader = function(name, value) {
-  const lowerName = name && typeof name === 'string' ? name.toLowerCase() : '';
-  if (lowerName === 'x-action-redirect' || lowerName === 'location') {
-    if (typeof value === 'string') {
-      let cleanValue = '';
-      for (let i = 0; i < value.length; i++) {
-        const ch = value.charCodeAt(i);
-        if (ch === 9 || (ch >= 32 && ch <= 126) || (ch >= 160 && ch <= 255)) {
-          cleanValue += value[i];
-        } else if (ch > 255) {
-          cleanValue += encodeURIComponent(value[i]);
-        }
+  if (typeof value === 'string') {
+    let cleanValue = '';
+    for (let i = 0; i < value.length; i++) {
+      const ch = value.charCodeAt(i);
+      if (ch === 9 || (ch >= 32 && ch <= 126)) {
+        cleanValue += value[i];
+      } else if (ch > 126) {
+        cleanValue += encodeURIComponent(value[i]);
       }
-      value = cleanValue;
     }
+    value = cleanValue;
   }
   return originalSetHeader.call(this, name, value);
 };
@@ -416,7 +421,7 @@ async function migrateLocalSqliteToPostgres(sqlitePath, pgConnectionString) {
 
   const { Client } = pg
   const sqliteDb = new Database(sqlitePath, { readonly: true })
-  const pgClient = new Client({ connectionString: pgConnectionString })
+  const pgClient = new Client({ connectionString: pgConnectionString, connectionTimeoutMillis: 5000 })
 
   try {
     await pgClient.connect()
@@ -530,9 +535,12 @@ app.whenReady().then(async () => {
 
   if (isOnlineDb) {
     try {
-      await migrateLocalSqliteToPostgres(dbPath, process.env.DATABASE_URL)
+      await Promise.race([
+        migrateLocalSqliteToPostgres(dbPath, process.env.DATABASE_URL),
+        new Promise((_, reject) => setTimeout(() => reject(new Error('DB Migration timed out after 7s')), 7000))
+      ])
     } catch (err) {
-      console.error('Database auto-migration failed:', err)
+      console.warn('Database auto-migration skipped or timed out:', err.message)
     }
   }
 

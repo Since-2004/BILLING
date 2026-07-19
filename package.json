@@ -1,6 +1,6 @@
 {
   "name": "billing",
-  "version": "0.1.5",
+  "version": "0.1.6",
   "private": true,
   "main": "main.js",
   "scripts": {
@@ -64,6 +64,7 @@
     "directories": {
       "output": "dist"
     },
+    "executableName": "Nucleus",
     "files": [
       "main.js",
       "dev.db",
@@ -96,10 +97,7 @@
       "**/node_modules/@prisma/**/*"
     ],
     "win": {
-      "target": "nsis",
-      "signtoolOptions": {
-        "sign": "./sign-noop.js"
-      }
+      "target": "nsis"
     },
     "nsis": {
       "oneClick": true,

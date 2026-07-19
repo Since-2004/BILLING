@@ -56,9 +56,12 @@ export async function getMonthlyDailyEntries(monthStr: string) {
       }
     })
 
-    // Also fetch the company profile to display on the print view
+    // Fetch company profile & inventory items for smart item inferencing
     const company = await prisma.company.findUnique({
       where: { id: dbUser.company_id }
+    })
+    const inventoryItems = await prisma.item.findMany({
+      where: { company_id: dbUser.company_id }
     })
 
     // Calculate next invoice number
@@ -98,7 +101,8 @@ export async function getMonthlyDailyEntries(monthStr: string) {
       data: JSON.parse(JSON.stringify(transactions)),
       consolidatedInvoices: JSON.parse(JSON.stringify(consolidatedInvoices)),
       nextInvoiceNo,
-      company: JSON.parse(JSON.stringify(company))
+      company: JSON.parse(JSON.stringify(company)),
+      inventoryItems: JSON.parse(JSON.stringify(inventoryItems))
     }
   } catch (error: any) {
     console.error('Failed to get monthly sales:', error)

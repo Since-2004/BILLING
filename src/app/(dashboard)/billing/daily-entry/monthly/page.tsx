@@ -93,18 +93,108 @@ function MonthlyReportContent() {
   const [consolidatedInvoices, setConsolidatedInvoices] = useState<any[]>([])
   const [nextInvoiceNo, setNextInvoiceNo] = useState('')
   const [consolidatedItems, setConsolidatedItems] = useState<any[]>([])
+  const [inventoryItems, setInventoryItems] = useState<any[]>([])
   const [isEditingMode, setIsEditingMode] = useState(false)
   const [saving, setSaving] = useState(false)
+
+  // Filter transactions
+  const filteredTx = transactions.filter(tx => {
+    // 1. Daily entry filter
+    if (dailyEntriesOnly) {
+      const isDaily = (tx.notes && tx.notes.startsWith('DC No:')) || tx.party_name === 'Daily Sales Customer'
+      if (!isDaily) return false
+    }
+
+    // 2. Customer dropdown filter
+    if (customerSearch !== '') {
+      const txPartyName = tx.party_name || 'Walk-in Customer'
+      if (txPartyName !== customerSearch) return false
+    }
+
+    // 3. Branch filter
+    if (selectedBranch !== 'ALL') {
+      if (tx.branch_id !== selectedBranch) return false
+    }
+
+    return true
+  })
+
+  // Selected transactions only
+  const selectedTx = filteredTx.filter(tx => selectedIds.includes(tx.id))
 
   // Find if there is an existing saved consolidated invoice for the selected customer
   const existingInvoice = consolidatedInvoices.find(tx => 
     customerSearch ? (tx.party_name === customerSearch) : false
   )
 
+  // Helper to resolve line items intelligently (with fallback inference using inventory items)
+  const getTxLineItems = (tx: any) => {
+    if (tx.items && tx.items.length > 0) {
+      return tx.items.map((item: any) => ({
+        item_id: item.item_id || null,
+        item_name: item.item_name,
+        quantity: item.quantity,
+        rate: item.rate,
+        discount: item.discount || 0,
+        tax_rate: item.tax_rate || 0,
+        tax_amount: item.tax_amount || 0,
+        total: item.total
+      }))
+    }
+
+    const amount = tx.subtotal || tx.total || 0
+    if (amount > 0 && inventoryItems && inventoryItems.length > 0) {
+      const matchingItem = inventoryItems.find((inv: any) => {
+        const price = inv.sale_price_1 || 0
+        return price > 0 && (amount % price === 0 || amount === price)
+      }) || inventoryItems[0]
+
+      const itemPrice = matchingItem.sale_price_1 || 0
+      if (itemPrice > 0 && amount % itemPrice === 0) {
+        const qty = Math.round(amount / itemPrice)
+        return [{
+          item_id: matchingItem.id,
+          item_name: matchingItem.name,
+          quantity: qty,
+          rate: itemPrice,
+          discount: 0,
+          tax_rate: matchingItem.tax_rate || 0,
+          tax_amount: tx.tax_amount || 0,
+          total: amount
+        }]
+      } else if (itemPrice > 0) {
+        const qty = Math.max(1, Math.round(amount / itemPrice))
+        const derivedRate = Math.round(amount / qty)
+        return [{
+          item_id: matchingItem.id,
+          item_name: matchingItem.name,
+          quantity: qty,
+          rate: derivedRate,
+          discount: 0,
+          tax_rate: matchingItem.tax_rate || 0,
+          tax_amount: tx.tax_amount || 0,
+          total: amount
+        }]
+      }
+    }
+
+    const name = (tx.notes && tx.notes.startsWith('DC No:')) ? 'Daily Sales Entry' : 'Sales Invoice'
+    return [{
+      item_id: null,
+      item_name: name,
+      quantity: 1,
+      rate: amount,
+      discount: 0,
+      tax_rate: 0,
+      tax_amount: tx.tax_amount || 0,
+      total: amount
+    }]
+  }
+
   useEffect(() => {
     if (editId || isEditingMode) return // Skip if editing
     
-    if (existingInvoice) {
+    if (existingInvoice && existingInvoice.items && existingInvoice.items.length > 0) {
       setConsolidatedInvoiceNo(existingInvoice.transaction_no)
       const formattedItems = existingInvoice.items.map((item: any) => ({
         item_id: item.item_id,
@@ -122,7 +212,8 @@ function MonthlyReportContent() {
       // Generate consolidatedItems dynamically from selectedTx
       const productSummary: Record<string, any> = {}
       selectedTx.forEach(tx => {
-        tx.items?.forEach((item: any) => {
+        const lineItems = getTxLineItems(tx)
+        lineItems.forEach((item: any) => {
           const rate = item.rate || 0
           const key = `${item.item_name}_${rate}`
           if (!productSummary[key]) {
@@ -131,7 +222,7 @@ function MonthlyReportContent() {
               item_name: item.item_name,
               quantity: 0,
               rate,
-              discount: 0,
+              discount: item.discount || 0,
               tax_rate: item.tax_rate || 0,
               tax_amount: 0,
               total: 0
@@ -144,7 +235,7 @@ function MonthlyReportContent() {
       })
       setConsolidatedItems(Object.values(productSummary))
     }
-  }, [selectedMonth, customerSearch, existingInvoice, nextInvoiceNo, selectedIds, editId, isEditingMode])
+  }, [selectedMonth, customerSearch, existingInvoice, nextInvoiceNo, selectedIds, editId, isEditingMode, transactions, dailyEntriesOnly, selectedBranch, inventoryItems])
 
   useEffect(() => {
     fetch('/api/v1/clients')
@@ -191,6 +282,7 @@ function MonthlyReportContent() {
           setTransactions(res.data || [])
           setConsolidatedInvoices(res.consolidatedInvoices || [])
           setNextInvoiceNo(res.nextInvoiceNo || '')
+          setInventoryItems(res.inventoryItems || [])
         }
       } else {
         toast.error(editRes.error || 'Failed to load consolidated invoice for editing')
@@ -202,6 +294,7 @@ function MonthlyReportContent() {
         setConsolidatedInvoices(res.consolidatedInvoices || [])
         setNextInvoiceNo(res.nextInvoiceNo || '')
         setCompany(res.company)
+        setInventoryItems(res.inventoryItems || [])
       } else {
         toast.error(res.error || 'Failed to load monthly sales data')
       }
@@ -222,35 +315,13 @@ function MonthlyReportContent() {
     return '-'
   }
 
-  // Filter transactions
-  const filteredTx = transactions.filter(tx => {
-    // 1. Daily entry filter
-    if (dailyEntriesOnly) {
-      const isDaily = (tx.notes && tx.notes.startsWith('DC No:')) || tx.party_name === 'Daily Sales Customer'
-      if (!isDaily) return false
-    }
-
-    // 2. Customer dropdown filter
-    if (customerSearch !== '') {
-      const txPartyName = tx.party_name || 'Walk-in Customer'
-      if (txPartyName !== customerSearch) return false
-    }
-
-    // 3. Branch filter
-    if (selectedBranch !== 'ALL') {
-      if (tx.branch_id !== selectedBranch) return false
-    }
-
-    return true
-  })
-
   // Check if any filtered transactions have tax
   const hasTaxColumns = filteredTx.some(tx => tx.tax_amount > 0)
 
   // Sync selectedIds when transactions load or filters toggle
   useEffect(() => {
     setSelectedIds(filteredTx.map(t => t.id))
-  }, [transactions, dailyEntriesOnly])
+  }, [transactions, dailyEntriesOnly, customerSearch, selectedBranch])
 
   // Format currency helpers
   const formatCurrency = (paise: number) => {
@@ -302,9 +373,6 @@ function MonthlyReportContent() {
   const activeBr = selectedBranch !== 'ALL'
     ? branches.find(b => b.id === selectedBranch)
     : (branches.find(b => b.is_default) || branches.find(b => b.bank_name) || branches[0])
-
-  // Selected transactions only
-  const selectedTx = filteredTx.filter(tx => selectedIds.includes(tx.id))
 
   // Consolidated invoice metrics (dynamically switched based on view/items state)
   const totalSubtotal = reportView === 'detailed'
@@ -472,7 +540,8 @@ function MonthlyReportContent() {
   // Product sales aggregations
   const productSummary: Record<string, { name: string, quantity: number, rate: number, total: number }> = {}
   selectedTx.forEach(tx => {
-    tx.items?.forEach((item: any) => {
+    const lineItems = getTxLineItems(tx)
+    lineItems.forEach((item: any) => {
       const rate = item.rate || 0
       const key = `${item.item_name}_${rate}`
       if (!productSummary[key]) {
@@ -820,8 +889,8 @@ function MonthlyReportContent() {
                         <th className="px-3 py-2.5">Date</th>
                         <th className="px-3 py-2.5">Invoice No</th>
                         <th className="px-3 py-2.5">DC Number</th>
-                        <th className="px-3 py-2.5">Client Customer</th>
-                        <th className="px-3 py-2.5">Items (Qty)</th>
+                        <th className="px-3 py-2.5">Item Name</th>
+                        <th className="px-3 py-2.5 text-center">Quantity</th>
                         <th className="px-3 py-2.5 text-center">Payment</th>
                         <th className="px-3 py-2.5 text-right">Subtotal</th>
                         {hasTaxColumns && (
@@ -836,6 +905,9 @@ function MonthlyReportContent() {
                     <tbody className="divide-y divide-zinc-200">
                       {filteredTx.map((tx, idx) => {
                         const isSelected = selectedIds.includes(tx.id)
+                        const lineItems = getTxLineItems(tx)
+                        const itemNameStr = lineItems.map((item: any) => item.item_name).join(', ')
+                        const itemQtyStr = lineItems.map((item: any) => item.quantity).join(', ')
                         return (
                           <tr key={tx.id} className={`${idx % 2 === 0 ? 'bg-white' : 'bg-zinc-50/50'} ${!isSelected ? 'opacity-40 print:hidden' : ''}`}>
                             <td className="px-3 py-2.5 print:hidden">
@@ -859,9 +931,11 @@ function MonthlyReportContent() {
                               </Link>
                             </td>
                             <td className="px-3 py-2.5 font-mono">{getDcNumber(tx.notes)}</td>
-                            <td className="px-3 py-2.5 truncate max-w-[120px]">{tx.party_name || 'Walk-in Customer'}</td>
-                            <td className="px-3 py-2.5 text-xs text-zinc-500 max-w-[150px] truncate" title={tx.items?.map((item: any) => `${item.item_name} (x${item.quantity})`).join(', ')}>
-                              {tx.items?.map((item: any) => `${item.item_name} (x${item.quantity})`).join(', ') || '-'}
+                            <td className="px-3 py-2.5 font-medium text-zinc-900 truncate max-w-[180px]" title={itemNameStr}>
+                              {itemNameStr}
+                            </td>
+                            <td className="px-3 py-2.5 text-center font-mono font-bold text-zinc-900">
+                              {itemQtyStr}
                             </td>
                             <td className="px-3 py-2.5 text-center font-bold">{tx.payments?.[0]?.mode || 'CASH'}</td>
                             <td className="px-3 py-2.5 text-right font-mono">{formatCurrency(tx.subtotal)}</td>
