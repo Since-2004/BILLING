@@ -176,6 +176,24 @@ export async function saveConsolidatedInvoice(data: {
     }
     const transactionNo = `${prefix}${String(nextNumber).padStart(5, '0')}`
 
+    let isCreditClient = false
+    if (data.partyId) {
+      const clientObj = await prisma.client.findUnique({
+        where: { id: data.partyId },
+        select: { client_type: true }
+      })
+      if (clientObj?.client_type === 'CREDIT') isCreditClient = true
+    } else if (data.partyName) {
+      const clientObj = await prisma.client.findFirst({
+        where: { company_id: dbUser.company_id!, name: data.partyName },
+        select: { client_type: true }
+      })
+      if (clientObj?.client_type === 'CREDIT') isCreditClient = true
+    }
+
+    const amountPaid = isCreditClient ? 0 : data.total
+    const status = isCreditClient ? 'PENDING' : 'PAID'
+
     const newTx = await prisma.transaction.create({
       data: {
         company_id: dbUser.company_id!,
@@ -189,8 +207,8 @@ export async function saveConsolidatedInvoice(data: {
         discount: data.discount,
         tax_amount: data.taxAmount,
         total: data.total,
-        amount_paid: data.total, // Fully paid by default
-        status: 'PAID',
+        amount_paid: amountPaid,
+        status: status,
         notes: `Consolidated Invoice for ${data.monthStr}`,
         items: {
           create: data.items.map(item => ({
@@ -205,7 +223,7 @@ export async function saveConsolidatedInvoice(data: {
           }))
         },
         payments: {
-          create: [{
+          create: isCreditClient || amountPaid === 0 ? [] : [{
             mode: 'CASH',
             amount: data.total
           }]
@@ -295,6 +313,24 @@ export async function updateConsolidatedInvoice(
       })
       if (!oldTx) throw new Error('Invoice not found')
 
+      let isCreditClient = false
+      if (oldTx.party_id) {
+        const clientObj = await tx.client.findUnique({
+          where: { id: oldTx.party_id },
+          select: { client_type: true }
+        })
+        if (clientObj?.client_type === 'CREDIT') isCreditClient = true
+      } else if (oldTx.party_name) {
+        const clientObj = await tx.client.findFirst({
+          where: { company_id: dbUser.company_id!, name: oldTx.party_name },
+          select: { client_type: true }
+        })
+        if (clientObj?.client_type === 'CREDIT') isCreditClient = true
+      }
+
+      const amountPaid = isCreditClient ? 0 : data.total
+      const status = isCreditClient ? 'PENDING' : 'PAID'
+
       // Recreate items
       await tx.transactionItem.deleteMany({ where: { transaction_id: id } })
 
@@ -304,7 +340,8 @@ export async function updateConsolidatedInvoice(
           subtotal: data.subtotal,
           tax_amount: data.taxAmount,
           total: data.total,
-          amount_paid: data.total, // Re-sync payment amount
+          amount_paid: amountPaid,
+          status: status,
           items: {
             create: data.items.map(item => ({
               item_id: item.item_id || null,
@@ -319,7 +356,7 @@ export async function updateConsolidatedInvoice(
           },
           payments: {
             deleteMany: {}, // Delete old payments
-            create: [{
+            create: isCreditClient || amountPaid === 0 ? [] : [{
               mode: 'CASH',
               amount: data.total
             }]

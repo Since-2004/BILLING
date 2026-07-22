@@ -136,6 +136,7 @@ export default function BillingPage() {
       setCart(cart.map(c => c.item_id === item.id ? {
         ...c,
         quantity: newQty,
+        qtyInput: String(newQty),
         tax_amount: newTaxAmount,
         total: newQty * existing.rate + newTaxAmount
       } : c))
@@ -144,7 +145,9 @@ export default function BillingPage() {
         item_id: item.id,
         item_name: item.name,
         quantity: 1,
+        qtyInput: '1',
         rate: rate,
+        rateInput: (rate / 100).toFixed(2),
         tax_rate: tax_rate,
         tax_amount: tax_amount,
         total: item_total
@@ -183,6 +186,7 @@ export default function BillingPage() {
         return {
           ...c,
           rate: newRate,
+          rateInput: (newRate / 100).toFixed(2),
           tax_amount: newTaxAmount,
           total: c.quantity * newRate + newTaxAmount
         }
@@ -190,8 +194,9 @@ export default function BillingPage() {
     })
   }, [selectedClient, clients, items])
 
-  const updateQty = (i: number, qty: number) => {
-    if (qty < 1) return
+  const updateQty = (i: number, qtyStr: string) => {
+    const qty = parseInt(qtyStr) || 0
+    if (qty < 0) return
     const item = cart[i]
     const stock = stockMap[item.item_id] || 0
     if (qty > stock) {
@@ -201,15 +206,20 @@ export default function BillingPage() {
     setCart(cart.map((c, idx) => idx !== i ? c : {
       ...c,
       quantity: qty,
+      qtyInput: qtyStr,
       total: qty * c.rate + Math.round(qty * c.rate * c.tax_rate / 100)
     }))
   }
 
-  const updateRate = (i: number, rate: number) => {
+  const updateRate = (i: number, rateStr: string) => {
+    const rateRupees = parseFloat(rateStr) || 0
+    if (rateRupees < 0) return
+    const ratePaise = Math.round(rateRupees * 100)
     setCart(cart.map((c, idx) => idx !== i ? c : {
       ...c,
-      rate,
-      total: c.quantity * rate + Math.round(c.quantity * rate * c.tax_rate / 100)
+      rate: ratePaise,
+      rateInput: rateStr,
+      total: c.quantity * ratePaise + Math.round(c.quantity * ratePaise * c.tax_rate / 100)
     }))
   }
 
@@ -253,19 +263,36 @@ export default function BillingPage() {
 
   const handleCheckout = async () => {
     if (cart.length === 0) return toast.error('Cart is empty')
+    
+    const hasInvalidQty = cart.some(c => !c.quantity || c.quantity < 1)
+    if (hasInvalidQty) {
+      toast.error('Please enter a valid quantity of 1 or more for all items')
+      return
+    }
+
+    const hasInvalidRate = cart.some(c => c.rate < 0)
+    if (hasInvalidRate) {
+      toast.error('Rate cannot be negative')
+      return
+    }
+
     setLoading(true)
     
+    const clientRecord = clients.find((c: any) => c.id === selectedClient)
+    const isCredit = paymentMode === 'CREDIT' || clientRecord?.client_type === 'CREDIT'
+
     const payload = {
       type: 'SALES_INVOICE',
       branch_id: selectedBranch,
       party_id: selectedClient || null,
-      party_name: clients.find((c:any) => c.id === selectedClient)?.name || 'Walk-in Customer',
+      party_name: clientRecord?.name || 'Walk-in Customer',
       subtotal,
       discount: discountAmt,
       tax_amount: cgstTotal + sgstTotal,
       total: finalTotal,
-      amount_paid: paymentMode === 'CREDIT' ? 0 : finalTotal,
-      payment_mode: paymentMode,
+      amount_paid: isCredit ? 0 : finalTotal,
+      payment_mode: isCredit ? 'CREDIT' : paymentMode,
+      status: isCredit ? 'PENDING' : 'PAID',
       items: cart.map(c => {
         const rate = c.rate
         const qty = c.quantity
@@ -505,8 +532,8 @@ export default function BillingPage() {
                 <div className="flex items-center gap-1">
                   <span className="text-[10px] uppercase font-bold text-zinc-400 sm:hidden">Qty</span>
                   <input
-                    type="number" min="1" value={item.quantity}
-                    onChange={e => updateQty(i, Number(e.target.value))}
+                    type="number" min="0" value={item.qtyInput ?? item.quantity}
+                    onChange={e => updateQty(i, e.target.value)}
                     data-billing-input="qty"
                     data-index={i}
                     className="w-14 sm:w-16 text-center border border-zinc-300 dark:border-zinc-600 rounded px-1 py-1 text-sm bg-transparent"
@@ -515,8 +542,8 @@ export default function BillingPage() {
                 <div className="flex items-center gap-1">
                   <span className="text-[10px] uppercase font-bold text-zinc-400 sm:hidden">Rate</span>
                   <input
-                    type="number" step="0.01" value={(item.rate / 100).toFixed(2)}
-                    onChange={e => updateRate(i, Math.round(Number(e.target.value) * 100))}
+                    type="number" step="0.01" value={item.rateInput ?? (item.rate / 100).toFixed(2)}
+                    onChange={e => updateRate(i, e.target.value)}
                     data-billing-input="rate"
                     data-index={i}
                     className="w-20 sm:w-24 text-right border border-zinc-300 dark:border-zinc-600 rounded px-1 py-1 text-sm bg-transparent"

@@ -81,6 +81,18 @@ export async function POST(request: Request) {
 
       const transaction_no = `${prefix}${String(nextNumber).padStart(5, '0')}`
 
+      const party = body.party_id
+        ? await tx.client.findUnique({ where: { id: body.party_id } })
+        : (body.party_name ? await tx.client.findFirst({ where: { company_id: dbUser.company_id!, name: body.party_name } }) : null)
+
+      const isCredit = body.payment_mode === 'CREDIT' || party?.client_type === 'CREDIT'
+
+      const amtPaid = isCredit ? 0 : Math.round(Number(body.amount_paid) ?? 0)
+      const totalAmt = Math.round(Number(body.total) || 0)
+      const computedStatus = isCredit
+        ? (amtPaid > 0 && amtPaid < totalAmt ? 'PARTIAL' : (amtPaid >= totalAmt && totalAmt > 0 ? 'PAID' : 'PENDING'))
+        : (body.status || (amtPaid >= totalAmt && totalAmt > 0 ? 'PAID' : (amtPaid > 0 ? 'PARTIAL' : 'PENDING')))
+
       // Create the main transaction
       const newTx = await tx.transaction.create({
         data: {
@@ -94,9 +106,9 @@ export async function POST(request: Request) {
           subtotal: Math.round(Number(body.subtotal) || 0),
           discount: Math.round(Number(body.discount) || 0),
           tax_amount: Math.round(Number(body.tax_amount) || 0),
-          total: Math.round(Number(body.total) || 0),
-          amount_paid: Math.round(Number(body.amount_paid) || 0),
-          status: body.status || 'PAID',
+          total: totalAmt,
+          amount_paid: amtPaid,
+          status: computedStatus,
           notes: body.notes,
           created_by: user.id,
           items: {
@@ -112,9 +124,9 @@ export async function POST(request: Request) {
             }))
           },
           payments: {
-            create: [{
+            create: isCredit || amtPaid === 0 ? [] : [{
               mode: body.payment_mode || 'CASH',
-              amount: Math.round(Number(body.total) || 0)
+              amount: amtPaid
             }]
           }
         },

@@ -283,6 +283,8 @@ export default function DailyEntryPage() {
     // DC notes format
     const formattedNotes = dcNumber ? `DC No: ${dcNumber.trim()}` : ''
 
+    const isCredit = paymentMode === 'CREDIT' || clientRecord?.client_type === 'CREDIT'
+
     const payload = {
       type: 'SALES_INVOICE',
       branch_id: selectedBranch,
@@ -293,8 +295,9 @@ export default function DailyEntryPage() {
       discount: discountAmt,
       tax_amount: taxAmount,
       total: finalTotal,
-      amount_paid: paymentMode === 'CREDIT' ? 0 : finalTotal,
-      payment_mode: paymentMode,
+      amount_paid: isCredit ? 0 : finalTotal,
+      payment_mode: isCredit ? 'CREDIT' : paymentMode,
+      status: isCredit ? 'PENDING' : 'PAID',
       notes: formattedNotes,
       items: activeEntries.map(entry => {
         const itemSubtotal = Math.round(entry.qty * entry.price)

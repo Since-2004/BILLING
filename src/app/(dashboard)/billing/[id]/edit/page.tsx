@@ -83,7 +83,9 @@ export default function EditBillingPage() {
             item_id: item.item_id,
             item_name: item.item_name,
             quantity: item.quantity,
+            qtyInput: String(item.quantity),
             rate: item.rate,
+            rateInput: (item.rate / 100).toFixed(2),
             tax_rate: item.tax_rate,
             tax_amount: item.tax_amount,
             total: item.total
@@ -158,6 +160,7 @@ export default function EditBillingPage() {
         return {
           ...c,
           rate: newRate,
+          rateInput: (newRate / 100).toFixed(2),
           tax_amount: newTaxAmount,
           total: c.quantity * newRate + newTaxAmount
         }
@@ -197,6 +200,7 @@ export default function EditBillingPage() {
       setCart(cart.map(c => c.item_id === item.id ? {
         ...c,
         quantity: newQty,
+        qtyInput: String(newQty),
         tax_amount: newTaxAmount,
         total: newQty * existing.rate + newTaxAmount
       } : c))
@@ -205,7 +209,9 @@ export default function EditBillingPage() {
         item_id: item.id,
         item_name: item.name,
         quantity: 1,
+        qtyInput: '1',
         rate: rate,
+        rateInput: (rate / 100).toFixed(2),
         tax_rate: tax_rate,
         tax_amount: tax_amount,
         total: item_total
@@ -213,8 +219,9 @@ export default function EditBillingPage() {
     }
   }
 
-  const updateQty = (i: number, qty: number) => {
-    if (qty < 1) return
+  const updateQty = (i: number, qtyStr: string) => {
+    const qty = parseInt(qtyStr) || 0
+    if (qty < 0) return
     const item = cart[i]
     const stock = stockMap[item.item_id] || 0
     if (!isPurchaseType && qty > stock) {
@@ -224,15 +231,20 @@ export default function EditBillingPage() {
     setCart(cart.map((c, idx) => idx !== i ? c : {
       ...c,
       quantity: qty,
+      qtyInput: qtyStr,
       total: qty * c.rate + Math.round(qty * c.rate * c.tax_rate / 100)
     }))
   }
 
-  const updateRate = (i: number, rate: number) => {
+  const updateRate = (i: number, rateStr: string) => {
+    const rateRupees = parseFloat(rateStr) || 0
+    if (rateRupees < 0) return
+    const ratePaise = Math.round(rateRupees * 100)
     setCart(cart.map((c, idx) => idx !== i ? c : {
       ...c,
-      rate,
-      total: c.quantity * rate + Math.round(c.quantity * rate * c.tax_rate / 100)
+      rate: ratePaise,
+      rateInput: rateStr,
+      total: c.quantity * ratePaise + Math.round(c.quantity * ratePaise * c.tax_rate / 100)
     }))
   }
 
@@ -275,6 +287,19 @@ export default function EditBillingPage() {
 
   const handleSave = async () => {
     if (cart.length === 0) return toast.error('Cart is empty')
+
+    const hasInvalidQty = cart.some(c => !c.quantity || c.quantity < 1)
+    if (hasInvalidQty) {
+      toast.error('Please enter a valid quantity of 1 or more for all items')
+      return
+    }
+
+    const hasInvalidRate = cart.some(c => c.rate < 0)
+    if (hasInvalidRate) {
+      toast.error('Rate cannot be negative')
+      return
+    }
+
     setSaving(true)
     
     let partyName = 'Walk-in Customer'
@@ -283,6 +308,9 @@ export default function EditBillingPage() {
     } else {
       partyName = clients.find((c: any) => c.id === selectedParty)?.name || 'Walk-in Customer'
     }
+
+    const clientRecord = clients.find((c: any) => c.id === selectedParty)
+    const isCredit = paymentMode === 'CREDIT' || clientRecord?.client_type === 'CREDIT'
 
     const payload = {
       type: txType,
@@ -294,8 +322,9 @@ export default function EditBillingPage() {
       discount: discountAmt,
       tax_amount: cgstTotal + sgstTotal,
       total: finalTotal,
-      amount_paid: paymentMode === 'CREDIT' ? 0 : finalTotal,
-      payment_mode: paymentMode,
+      amount_paid: isCredit ? 0 : finalTotal,
+      payment_mode: isCredit ? 'CREDIT' : paymentMode,
+      status: isCredit ? 'PENDING' : 'PAID',
       notes: notes,
       items: cart.map(c => {
         const rate = c.rate
@@ -548,17 +577,17 @@ export default function EditBillingPage() {
                     <td className="p-3 text-center">
                       <input
                         type="number"
-                        min="1"
-                        value={c.quantity}
-                        onChange={e => updateQty(i, Number(e.target.value))}
+                        min="0"
+                        value={c.qtyInput ?? c.quantity}
+                        onChange={e => updateQty(i, e.target.value)}
                         className="w-14 px-1.5 py-0.5 border border-zinc-300 dark:border-zinc-700 rounded text-center font-mono font-bold bg-transparent"
                       />
                     </td>
                     <td className="p-3 text-right">
                       <input
                         type="number"
-                        value={(c.rate / 100).toFixed(2)}
-                        onChange={e => updateRate(i, Math.round(parseFloat(e.target.value) * 100) || 0)}
+                        value={c.rateInput ?? (c.rate / 100).toFixed(2)}
+                        onChange={e => updateRate(i, e.target.value)}
                         className="w-20 px-1 py-0.5 border border-zinc-300 dark:border-zinc-700 rounded text-right font-mono bg-transparent"
                       />
                     </td>

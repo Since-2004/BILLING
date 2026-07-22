@@ -47,7 +47,7 @@ export async function addTransactionPayment(transactionId: string, amountPaise: 
         where: { id: transactionId },
         data: {
           amount_paid: updatedAmountPaid,
-          status: updatedAmountPaid >= tx.total ? 'PAID' : 'PENDING'
+          status: updatedAmountPaid >= tx.total ? 'PAID' : (updatedAmountPaid > 0 ? 'PARTIAL' : 'PENDING')
         }
       })
 

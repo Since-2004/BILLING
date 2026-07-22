@@ -24,10 +24,14 @@ if (fs.existsSync(standaloneDir)) {
   // Copy BUILD_ID file
   const buildIdSrc = path.join(__dirname, '.next', 'BUILD_ID')
   const buildIdDest = path.join(standaloneDir, '.next', 'BUILD_ID')
+  fs.mkdirSync(path.dirname(buildIdDest), { recursive: true })
   if (fs.existsSync(buildIdSrc)) {
-    fs.mkdirSync(path.dirname(buildIdDest), { recursive: true })
     fs.cpSync(buildIdSrc, buildIdDest)
     console.log('Copied .next/BUILD_ID to standalone')
+  } else {
+    fs.writeFileSync(buildIdSrc, 'production', 'utf8')
+    fs.writeFileSync(buildIdDest, 'production', 'utf8')
+    console.log('Created fallback BUILD_ID in standalone')
   }
 
   // Copy .prisma folder to standalone node_modules

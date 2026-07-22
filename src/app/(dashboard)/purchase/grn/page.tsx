@@ -38,6 +38,7 @@ export default function GRNPage() {
       setCart(cart.map(c => c.item_id === item.id ? {
         ...c,
         quantity: newQty,
+        qtyInput: String(newQty),
         total: newQty * existing.rate + newTaxAmount
       } : c))
     } else {
@@ -45,27 +46,35 @@ export default function GRNPage() {
         item_id: item.id,
         item_name: item.name,
         quantity: 1,
+        qtyInput: '1',
         rate: rate,
+        rateInput: (rate / 100).toFixed(2),
         tax_rate: tax_rate,
         total: item_total
       }])
     }
   }
 
-  const updateQty = (i: number, qty: number) => {
-    if (qty < 1) return
+  const updateQty = (i: number, qtyStr: string) => {
+    const qty = parseInt(qtyStr) || 0
+    if (qty < 0) return
     setCart(cart.map((c, idx) => idx !== i ? c : {
       ...c,
       quantity: qty,
+      qtyInput: qtyStr,
       total: qty * c.rate + Math.round(qty * c.rate * c.tax_rate / 100)
     }))
   }
 
-  const updateRate = (i: number, rate: number) => {
+  const updateRate = (i: number, rateStr: string) => {
+    const rateRupees = parseFloat(rateStr) || 0
+    if (rateRupees < 0) return
+    const ratePaise = Math.round(rateRupees * 100)
     setCart(cart.map((c, idx) => idx !== i ? c : {
       ...c,
-      rate,
-      total: c.quantity * rate + Math.round(c.quantity * rate * c.tax_rate / 100)
+      rate: ratePaise,
+      rateInput: rateStr,
+      total: c.quantity * ratePaise + Math.round(c.quantity * ratePaise * c.tax_rate / 100)
     }))
   }
 
@@ -82,6 +91,19 @@ export default function GRNPage() {
   const handleCheckout = async () => {
     if (cart.length === 0) return toast.error('Cart is empty')
     if (!selectedSupplier) return toast.error('Please select a supplier for the Purchase Bill')
+
+    const hasInvalidQty = cart.some(c => !c.quantity || c.quantity < 1)
+    if (hasInvalidQty) {
+      toast.error('Please enter a valid quantity of 1 or more for all items')
+      return
+    }
+
+    const hasInvalidRate = cart.some(c => c.rate < 0)
+    if (hasInvalidRate) {
+      toast.error('Rate cannot be negative')
+      return
+    }
+
     setLoading(true)
     
     const payload = {
@@ -233,13 +255,13 @@ export default function GRNPage() {
                 <p className="text-xs text-zinc-400">{item.tax_rate}% GST</p>
               </div>
               <input
-                type="number" min="1" value={item.quantity}
-                onChange={e => updateQty(i, Number(e.target.value))}
+                type="number" min="0" value={item.qtyInput ?? item.quantity}
+                onChange={e => updateQty(i, e.target.value)}
                 className="w-16 text-center border border-zinc-300 dark:border-zinc-600 rounded px-1 py-1 text-sm bg-transparent"
               />
               <input
-                type="number" step="0.01" value={(item.rate / 100).toFixed(2)}
-                onChange={e => updateRate(i, Math.round(Number(e.target.value) * 100))}
+                type="number" step="0.01" value={item.rateInput ?? (item.rate / 100).toFixed(2)}
+                onChange={e => updateRate(i, e.target.value)}
                 className="w-24 text-right border border-zinc-300 dark:border-zinc-600 rounded px-1 py-1 text-sm bg-transparent"
               />
               <span className="w-24 text-right text-sm font-semibold">{formatCurrency(item.total)}</span>

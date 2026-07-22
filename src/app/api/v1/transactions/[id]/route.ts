@@ -56,6 +56,20 @@ export async function PUT(request: Request, { params }: { params: { id: string }
       const defaultBranchId = dbUser.user_branch_access[0]?.branch_id
       const branchId = body.branch_id || defaultBranchId || oldTx.branch_id
 
+      const partyId = body.party_id || oldTx.party_id
+      const partyName = body.party_name || oldTx.party_name
+      const party = partyId
+        ? await tx.client.findUnique({ where: { id: partyId } })
+        : (partyName ? await tx.client.findFirst({ where: { company_id: dbUser.company_id!, name: partyName } }) : null)
+
+      const isCredit = body.payment_mode === 'CREDIT' || party?.client_type === 'CREDIT'
+
+      const amtPaid = isCredit ? 0 : Math.round(Number(body.amount_paid) ?? 0)
+      const totalAmt = Math.round(Number(body.total) || 0)
+      const computedStatus = isCredit
+        ? (amtPaid > 0 && amtPaid < totalAmt ? 'PARTIAL' : (amtPaid >= totalAmt && totalAmt > 0 ? 'PAID' : 'PENDING'))
+        : (body.status || (amtPaid >= totalAmt && totalAmt > 0 ? 'PAID' : (amtPaid > 0 ? 'PARTIAL' : 'PENDING')))
+
       // 5. Update main transaction and recreate sub-records
       const newTx = await tx.transaction.update({
         where: { id: params.id },
@@ -67,9 +81,9 @@ export async function PUT(request: Request, { params }: { params: { id: string }
           subtotal: Math.round(Number(body.subtotal) || 0),
           discount: Math.round(Number(body.discount) || 0),
           tax_amount: Math.round(Number(body.tax_amount) || 0),
-          total: Math.round(Number(body.total) || 0),
-          amount_paid: Math.round(Number(body.amount_paid) || 0),
-          status: body.status || 'PAID',
+          total: totalAmt,
+          amount_paid: amtPaid,
+          status: computedStatus,
           notes: body.notes || null,
           items: {
             create: body.items.map((item: any) => ({
@@ -84,9 +98,9 @@ export async function PUT(request: Request, { params }: { params: { id: string }
             }))
           },
           payments: {
-            create: [{
+            create: isCredit || amtPaid === 0 ? [] : [{
               mode: body.payment_mode || 'CASH',
-              amount: Math.round(Number(body.amount_paid) || 0)
+              amount: amtPaid
             }]
           }
         },
